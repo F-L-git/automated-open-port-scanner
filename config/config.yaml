@@ -1,0 +1,32 @@
+# Конфигурация сканера
+targets_file: "targets/targets.txt"
+db_path: "scans.db"
+
+# Настройки сканирования
+scan:
+  masscan_rate: 3000 # Пакетов в секунду
+  nmap_threads: 10 # Параллельных потоков Nmap
+  default_ports: "1-65535" # Все порты
+
+# Оповещения
+telegram:
+  enabled: true
+  bot_token: "YOUR_BOT_TOKEN"
+  chat_id: "YOUR_CHAT_ID"
+
+webhook:
+  enabled: false
+  url: "https://your-webhook-url.com/alert"
+
+# Высокорисковые порты
+high_risk_ports:
+  - 22
+  - 23
+  - 3306
+  - 5432
+  - 6379
+  - 27017
+  - 9200
+  - 9000
+  - 8080
+  - 8443
