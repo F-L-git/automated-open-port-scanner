@@ -1,29 +1,15 @@
 #!/usr/bin/env python3
 import argparse
-import yaml
 import logging
 from src.scanner.engine import ScanEngine
 from src.storage.database import Database
 from src.notifier.telegram import TelegramNotifier
 from src.notifier.webhook import WebhookNotifier
+from src.notifier.email import EmailNotifier
 from src.notifier.alert_rules import AlertRules
 from src.analyzer.service_detector import ServiceAnalyzer
-
-
-def load_config(config_path: str = "config/config.yaml") -> dict:
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
-
-
-def setup_logging():
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler('scanner.log'),
-            logging.StreamHandler()
-        ]
-    )
+from src.utils.config import load_config
+from src.utils.logger import setup_logging
 
 
 def main():
@@ -41,33 +27,46 @@ def main():
     setup_logging()
     logger = logging.getLogger(__name__)
 
-    # Загрузка конфигурации
     config = load_config(args.config)
     targets_file = args.targets or config.get(
         "targets_file", "targets/targets.txt")
 
-    # Чтение целей
     with open(targets_file, 'r') as f:
         targets = [line.strip() for line in f if line.strip()]
 
     logger.info(f"Запуск сканирования для {len(targets)} целей")
 
-    # Запуск движка сканирования
     engine = ScanEngine(masscan_rate=args.rate)
     results = engine.run_scan(targets, args.ports)
 
-    # Сохранение в БД
     db = Database(config.get("db_path", "scans.db"))
     scan_id = db.save_scan_results(", ".join(targets), results)
     logger.info(f"Результаты сохранены в БД (ID: {scan_id})")
 
-    # Анализ и оповещения
+    # --- Дополнительное обогащение для веб-сервисов ---
+    for port_info in results.get("detailed_results", []):
+        if port_info.get("port") in [80, 443, 8080, 8443]:
+            web_info = ServiceAnalyzer.analyze_web_service(
+                port_info["ip"], port_info["port"])
+            port_info["web_analysis"] = web_info  # сохраняем в результат
+
+    # --- Настройка уведомлений ---
     notifiers = []
     if config.get("telegram", {}).get("enabled"):
         tg = config["telegram"]
         notifiers.append(TelegramNotifier(tg["bot_token"], tg["chat_id"]))
     if config.get("webhook", {}).get("enabled"):
         notifiers.append(WebhookNotifier(config["webhook"]["url"]))
+    if config.get("email", {}).get("enabled"):
+        email_cfg = config["email"]
+        notifiers.append(EmailNotifier(
+            email_cfg["smtp_server"],
+            email_cfg["smtp_port"],
+            email_cfg["username"],
+            email_cfg["password"],
+            email_cfg["from_addr"],
+            email_cfg["to_addrs"]
+        ))
 
     # Проверка высокорисковых сервисов
     for port_info in results.get("detailed_results", []):
@@ -86,8 +85,7 @@ def main():
                 notifier.send_alert(alert_msg)
             logger.warning(f"Высокорисковый сервис: {port_info}")
 
-    # Вывод сводки
-    logger.info(f"=== СВОДКА ===")
+    logger.info("=== СВОДКА ===")
     logger.info(f"Всего открытых портов: {results['total_open_ports']}")
     logger.info(f"Детально просканировано: {len(results['detailed_results'])}")
 

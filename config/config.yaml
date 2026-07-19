@@ -4,9 +4,9 @@ db_path: "scans.db"
 
 # Настройки сканирования
 scan:
-  masscan_rate: 3000 # Пакетов в секунду
-  nmap_threads: 10 # Параллельных потоков Nmap
-  default_ports: "1-65535" # Все порты
+  masscan_rate: 3000
+  nmap_threads: 10
+  default_ports: "1-65535"
 
 # Оповещения
 telegram:
@@ -17,6 +17,16 @@ telegram:
 webhook:
   enabled: false
   url: "https://your-webhook-url.com/alert"
+
+email:
+  enabled: false
+  smtp_server: "smtp.gmail.com"
+  smtp_port: 587
+  username: "your_email@gmail.com"
+  password: "your_app_password"
+  from_addr: "your_email@gmail.com"
+  to_addrs:
+    - "admin@example.com"
 
 # Высокорисковые порты
 high_risk_ports:

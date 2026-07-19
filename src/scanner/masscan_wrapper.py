@@ -56,3 +56,25 @@ class MasscanWrapper:
         except json.JSONDecodeError:
             # Если вывод в другом формате, используем альтернативный парсинг
             return self._parse_grepable(output)
+
+    def _parse_grepable(self, output: str) -> List[Dict]:
+        """
+        Альтернативный парсинг для grepable-вывода Masscan.
+        Формат: host: port/protocol
+        """
+        results = []
+        for line in output.splitlines():
+            if not line.strip():
+                continue
+            # Пример: "192.168.1.1: 80/tcp open"
+            parts = line.split()
+            if len(parts) >= 3:
+                ip_port = parts[0]  # "192.168.1.1:80"
+                proto = parts[1].split('/')[1] if '/' in parts[1] else 'tcp'
+                ip, port = ip_port.split(':')
+                results.append({
+                    "ip": ip,
+                    "port": int(port),
+                    "protocol": proto
+                })
+        return results
