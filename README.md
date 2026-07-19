@@ -177,7 +177,7 @@ python main.py -c config/production.yaml -t targets/prod.txt
 
 - `Masscan` – быстрое SYN-сканирование всех портов
 - `Nmap` – детальное сканирование только открытых портов
-- `ServiceAnalyzer` – обогащение данными `HTTP`/`HTTPS`/`SSL`
+- `ServiceAnalyzer` – обогащение данными HTTP/HTTPS/SSL
 - `SQLite` – хранение истории
 - Уведомления: Telegram, Webhook, Email
 
