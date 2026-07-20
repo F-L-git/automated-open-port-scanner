@@ -116,7 +116,6 @@ pip install -r requirements.txt
 2. Файл requirements.txt
 
 ```text
-nmass>=0.2.0
 requests>=2.28.0
 pyyaml>=6.0
 python-nmap>=0.7.0
