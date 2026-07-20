@@ -1,80 +1,96 @@
 import json
 import subprocess
-from typing import List, Dict, Optional
-from nmass import Masscan
+import tempfile
+import os
+from typing import List, Dict
 
 
 class MasscanWrapper:
     def __init__(self, binary_path: str = "masscan", rate: int = 1000):
         self.binary_path = binary_path
         self.rate = rate
-        self.scanner = Masscan(bin_path=binary_path)
 
     def scan_targets(self, targets: List[str], ports: str = "1-65535") -> List[Dict]:
         """
-        Выполняет сканирование с помощью Masscan.
-
-        Args:
-            targets: Список IP-адресов или CIDR-блоков
-            ports: Диапазон портов (например, "1-65535" или "80,443,8080")
-
-        Returns:
-            Список открытых портов в формате:
-            [{"ip": "192.168.1.1", "port": 80, "protocol": "tcp"}, ...]
+        Выполняет сканирование с помощью Masscan через subprocess.
         """
-        results = []
+        if not targets:
+            return []
 
-        for target in targets:
-            self.scanner.set_targets(target)
-            self.scanner.set_ports(ports)
-            self.scanner.set_rate(self.rate)
-            self.scanner.set_output_format("json")
+        # Создаём временный файл со списком целей
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt', encoding='utf-8') as f:
+            f.write('\n'.join(targets))
+            targets_file = f.name
 
-            # Запуск сканирования
-            output = self.scanner.run()
+        output_file = tempfile.NamedTemporaryFile(
+            delete=False, suffix='.json').name
 
-            # Парсинг JSON-вывода
-            parsed = self._parse_output(output)
-            results.extend(parsed)
+        cmd = [
+            self.binary_path,
+            '-iL', targets_file,
+            '-p', ports,
+            '--rate', str(self.rate),
+            '-oJ', output_file,
+            '--quiet'
+        ]
 
-        return results
-
-    def _parse_output(self, output: str) -> List[Dict]:
-        """Парсит JSON-вывод Masscan."""
         try:
-            data = json.loads(output)
-            results = []
-            for host in data.get("hosts", []):
-                ip = host.get("ip", "")
-                for port in host.get("ports", []):
-                    results.append({
-                        "ip": ip,
-                        "port": port.get("port"),
-                        "protocol": port.get("proto", "tcp")
-                    })
-            return results
-        except json.JSONDecodeError:
-            # Если вывод в другом формате, используем альтернативный парсинг
-            return self._parse_grepable(output)
+            result = subprocess.run(
+                cmd, check=False, capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"[!] Masscan завершился с кодом {result.returncode}")
+                print(f"STDERR: {result.stderr}")
+                print(f"STDOUT: {result.stdout}")
+                return []
 
-    def _parse_grepable(self, output: str) -> List[Dict]:
-        """
-        Альтернативный парсинг для grepable-вывода Masscan.
-        Формат: host: port/protocol
-        """
+            # Проверяем, что файл существует и не пустой
+            if not os.path.exists(output_file) or os.path.getsize(output_file) == 0:
+                print("[!] Masscan не создал выходной файл или он пуст.")
+                print(f"Проверьте права администратора и наличие Npcap.")
+                return []
+
+            # Читаем JSON-вывод
+            with open(output_file, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if not content:
+                    print("[!] Файл с результатами Masscan пуст.")
+                    return []
+                data = json.loads(content)
+
+            return self._parse_output(data)
+
+        except FileNotFoundError:
+            print(
+                f"[!] Исполняемый файл Masscan не найден по пути: {self.binary_path}")
+            print(
+                "Убедитесь, что masscan.exe установлен и добавлен в PATH, либо укажите полный путь.")
+            return []
+        except json.JSONDecodeError as e:
+            print(f"[!] Ошибка парсинга JSON из вывода Masscan: {e}")
+            # Попытаемся показать начало содержимого файла для диагностики
+            try:
+                with open(output_file, 'r', encoding='utf-8') as f:
+                    content = f.read()[:500]
+                print(f"Содержимое файла (первые 500 символов):\n{content}")
+            except:
+                pass
+            return []
+        finally:
+            # Удаляем временные файлы
+            if os.path.exists(targets_file):
+                os.remove(targets_file)
+            if os.path.exists(output_file):
+                os.remove(output_file)
+
+    def _parse_output(self, data: dict) -> List[Dict]:
+        """Парсит JSON-вывод Masscan."""
         results = []
-        for line in output.splitlines():
-            if not line.strip():
-                continue
-            # Пример: "192.168.1.1: 80/tcp open"
-            parts = line.split()
-            if len(parts) >= 3:
-                ip_port = parts[0]  # "192.168.1.1:80"
-                proto = parts[1].split('/')[1] if '/' in parts[1] else 'tcp'
-                ip, port = ip_port.split(':')
+        for host in data.get("hosts", []):
+            ip = host.get("ip", "")
+            for port in host.get("ports", []):
                 results.append({
                     "ip": ip,
-                    "port": int(port),
-                    "protocol": proto
+                    "port": port.get("port"),
+                    "protocol": port.get("proto", "tcp")
                 })
         return results

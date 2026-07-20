@@ -31,14 +31,21 @@ def main():
     targets_file = args.targets or config.get(
         "targets_file", "targets/targets.txt")
 
-    # Чтение целей
+    # Чтение целей (игнорируем пустые строки и комментарии)
     try:
         with open(targets_file, 'r', encoding='utf-8') as f:
-            targets = [line.strip() for line in f if line.strip()]
+            targets = []
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    targets.append(line)
     except FileNotFoundError:
         print(f"[!] Файл целей не найден: {targets_file}")
         exit(1)
-        logger.info(f"Запуск сканирования для {len(targets)} целей")
+
+    logger.info(f"Запуск сканирования для {len(targets)} целей:")
+    for t in targets:
+        logger.info(f"  - {t}")
 
     engine = ScanEngine(masscan_rate=args.rate)
     results = engine.run_scan(targets, args.ports)
