@@ -4,6 +4,7 @@ import tempfile
 import os
 from typing import List, Dict
 
+
 class MasscanWrapper:
     def __init__(self, binary_path: str = "masscan", rate: int = 1000):
         self.binary_path = binary_path
@@ -15,7 +16,8 @@ class MasscanWrapper:
         with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt', encoding='utf-8') as f:
             f.write('\n'.join(targets))
             targets_file = f.name
-        output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.json').name
+        output_file = tempfile.NamedTemporaryFile(
+            delete=False, suffix='.json').name
 
         cmd = [
             self.binary_path,
@@ -26,7 +28,9 @@ class MasscanWrapper:
             '--quiet'
         ]
         try:
-            result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+            # Таймаут 30 секунд – если не успел, считаем, что Masscan не работает
+            result = subprocess.run(
+                cmd, check=False, capture_output=True, text=True, timeout=30)
             if result.returncode != 0:
                 print(f"[!] Masscan завершился с кодом {result.returncode}")
                 print(f"STDERR: {result.stderr}")
@@ -45,8 +49,12 @@ class MasscanWrapper:
                 data = json.loads(content)
             return self._parse_output(data)
 
+        except subprocess.TimeoutExpired:
+            print("[!] Masscan не ответил за 30 секунд. Пропускаем.")
+            return []
         except FileNotFoundError:
-            print(f"[!] Исполняемый файл Masscan не найден по пути: {self.binary_path}")
+            print(
+                f"[!] Исполняемый файл Masscan не найден по пути: {self.binary_path}")
             return []
         except json.JSONDecodeError as e:
             print(f"[!] Ошибка парсинга JSON: {e}")

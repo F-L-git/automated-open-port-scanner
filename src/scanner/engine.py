@@ -4,34 +4,35 @@ from typing import List, Dict
 from .masscan_wrapper import MasscanWrapper
 from .nmap_wrapper import NmapWrapper
 
+
 class ScanEngine:
     def __init__(self, masscan_rate: int = 1000, nmap_threads: int = 10, force_nmap: bool = False,
                  masscan_binary: str = "masscan"):
-        self.masscan = MasscanWrapper(binary_path=masscan_binary, rate=masscan_rate)
+        self.masscan = MasscanWrapper(
+            binary_path=masscan_binary, rate=masscan_rate)
         self.nmap = NmapWrapper()
         self.nmap_threads = nmap_threads
         self.force_nmap = force_nmap
-        self.masscan_available = self._check_masscan(masscan_binary)
-
-    def _check_masscan(self, binary: str) -> bool:
-        """Проверяет, доступен ли Masscan в системе."""
-        return shutil.which(binary) is not None
+        # Проверяем, доступен ли Masscan в системе
+        self.masscan_available = shutil.which(masscan_binary) is not None
+        if not self.masscan_available:
+            print(
+                f"[!] Masscan не найден по пути '{masscan_binary}'. Будет использован только Nmap.")
 
     def run_scan(self, targets: List[str], ports: str = "1-65535") -> Dict:
         open_ports = []
 
-        # Если force_nmap или Masscan недоступен – пропускаем Masscan
+        # Если принудительно Nmap или Masscan недоступен – пропускаем Masscan
         if self.force_nmap or not self.masscan_available:
-            if not self.masscan_available:
-                print("[!] Masscan не найден в системе. Используем только Nmap.")
-            else:
+            if self.force_nmap:
                 print("[*] Используется только Nmap (force_nmap=True)")
+            # иначе уже выведено предупреждение в __init__
         else:
             print(f"[*] Запуск Masscan для {len(targets)} целей...")
             open_ports = self.masscan.scan_targets(targets, ports)
             print(f"[+] Masscan обнаружил {len(open_ports)} открытых портов")
 
-        # Если Masscan не дал результатов или force_nmap / недоступен – запускаем Nmap для всех целей
+        # Если Masscan не дал результатов или пропущен – запускаем Nmap для всех целей
         if not open_ports or self.force_nmap or not self.masscan_available:
             print("[*] Запускаем Nmap для всех указанных IP...")
             port_list = self._parse_ports(ports)
@@ -43,7 +44,8 @@ class ScanEngine:
                 }
                 for future in concurrent.futures.as_completed(futures):
                     for result in future.result():
-                        if result.get('state') == 'open':      # Только действительно открытые
+                        # Только действительно открытые
+                        if result.get('state') == 'open':
                             detailed_results.append(result)
             return {
                 "masscan_results": open_ports,
@@ -53,7 +55,8 @@ class ScanEngine:
         else:
             # Если Masscan сработал – сканируем только найденные порты
             targets_to_scan = self._group_by_ip(open_ports)
-            print(f"[*] Запуск детального сканирования Nmap для {len(targets_to_scan)} хостов...")
+            print(
+                f"[*] Запуск детального сканирования Nmap для {len(targets_to_scan)} хостов...")
             detailed_results = []
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.nmap_threads) as executor:
                 futures = {
