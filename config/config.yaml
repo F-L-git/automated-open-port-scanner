@@ -1,16 +1,13 @@
-# Конфигурация сканера
 targets_file: "targets/targets.txt"
 db_path: "scans.db"
 
-# Настройки сканирования
 scan:
   masscan_rate: 3000
   nmap_threads: 10
   default_ports: "1-65535"
 
-# Оповещения
 telegram:
-  enabled: true
+  enabled: false
   bot_token: "YOUR_BOT_TOKEN"
   chat_id: "YOUR_CHAT_ID"
 
@@ -28,7 +25,6 @@ email:
   to_addrs:
     - "admin@example.com"
 
-# Высокорисковые порты
 high_risk_ports:
   - 22
   - 23
