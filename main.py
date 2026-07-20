@@ -22,6 +22,8 @@ def main():
                         default=1000, help="Скорость сканирования")
     parser.add_argument(
         "--config", "-c", default="config/config.yaml", help="Путь к конфигу")
+    parser.add_argument("--force-nmap", action="store_true",
+                        help="Использовать только Nmap, пропустить Masscan")
     args = parser.parse_args()
 
     setup_logging()
@@ -47,7 +49,7 @@ def main():
     for t in targets:
         logger.info(f"  - {t}")
 
-    engine = ScanEngine(masscan_rate=args.rate)
+    engine = ScanEngine(masscan_rate=args.rate, force_nmap=args.force_nmap)
     results = engine.run_scan(targets, args.ports)
 
     db = Database(config.get("db_path", "scans.db"))

@@ -104,7 +104,7 @@
 sudo apt-get update
 sudo apt-get install masscan   # Ubuntu/Debian[reference:11]
 # или
-brew install masscan            # macOS
+brew install masscan           # macOS
 
 # Установка Nmap
 sudo apt-get install nmap
@@ -126,6 +126,7 @@ paramiko>=3.0.0
 3. Запуск
 
 > **Важно:**
+>
 > - Убедитесь, что установлены **Masscan** и **Nmap**, а также **Npcap** (для Windows).
 > - Всегда используйте **разрешённые цели** – сканирование чужих сетей без согласия может быть незаконным.
 
@@ -159,6 +160,14 @@ python main.py --targets targets/targets.txt --ports "1-65535" --rate 3000
 
 ```bash
 python main.py -c config/config.yaml -t targets/prod.txt
+```
+
+### Принудительное использование только Nmap (обход Masscan)
+
+Если Masscan не работает (например, на Windows без Npcap), можно запустить сканирование только через Nmap — медленнее, но надёжнее.
+
+```bash
+python main.py --targets targets/targets.txt --ports "22,80,443" --force-nmap
 ```
 
 ## КЛЮЧЕВЫЕ ОСОБЕННОСТИ
@@ -211,3 +220,4 @@ python main.py -c config/config.yaml -t targets/prod.txt
 > защищаемого периметра. Сочетание скорости `Masscan` и глубины `Nmap` позволяет
 > оперативно выявлять уязвимые сервисы, а система оповещений гарантирует,
 > что владельцы инфраструктуры будут проинформированы об обнаруженных рисках
+
