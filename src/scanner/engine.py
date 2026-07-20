@@ -1,30 +1,39 @@
 import concurrent.futures
+import shutil
 from typing import List, Dict
 from .masscan_wrapper import MasscanWrapper
 from .nmap_wrapper import NmapWrapper
 
-
 class ScanEngine:
-    def __init__(self, masscan_rate: int = 1000, nmap_threads: int = 10, force_nmap: bool = False):
-        self.masscan = MasscanWrapper(rate=masscan_rate)
+    def __init__(self, masscan_rate: int = 1000, nmap_threads: int = 10, force_nmap: bool = False,
+                 masscan_binary: str = "masscan"):
+        self.masscan = MasscanWrapper(binary_path=masscan_binary, rate=masscan_rate)
         self.nmap = NmapWrapper()
         self.nmap_threads = nmap_threads
         self.force_nmap = force_nmap
+        self.masscan_available = self._check_masscan(masscan_binary)
+
+    def _check_masscan(self, binary: str) -> bool:
+        """Проверяет, доступен ли Masscan в системе."""
+        return shutil.which(binary) is not None
 
     def run_scan(self, targets: List[str], ports: str = "1-65535") -> Dict:
-        # Уровень 1: Masscan (если не принудительно Nmap)
         open_ports = []
-        if not self.force_nmap:
+
+        # Если force_nmap или Masscan недоступен – пропускаем Masscan
+        if self.force_nmap or not self.masscan_available:
+            if not self.masscan_available:
+                print("[!] Masscan не найден в системе. Используем только Nmap.")
+            else:
+                print("[*] Используется только Nmap (force_nmap=True)")
+        else:
             print(f"[*] Запуск Masscan для {len(targets)} целей...")
             open_ports = self.masscan.scan_targets(targets, ports)
             print(f"[+] Masscan обнаружил {len(open_ports)} открытых портов")
-        else:
-            print("[*] Используется только Nmap (force_nmap=True)")
 
-        # Если Masscan не дал результатов или force_nmap, запускаем Nmap для всех целей
-        if not open_ports or self.force_nmap:
-            print(
-                "[*] Masscan не дал результатов или пропущен. Запускаем Nmap для всех указанных IP...")
+        # Если Masscan не дал результатов или force_nmap / недоступен – запускаем Nmap для всех целей
+        if not open_ports or self.force_nmap or not self.masscan_available:
+            print("[*] Запускаем Nmap для всех указанных IP...")
             port_list = self._parse_ports(ports)
             detailed_results = []
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.nmap_threads) as executor:
@@ -33,17 +42,18 @@ class ScanEngine:
                     for ip in targets
                 }
                 for future in concurrent.futures.as_completed(futures):
-                    detailed_results.extend(future.result())
+                    for result in future.result():
+                        if result.get('state') == 'open':      # Только действительно открытые
+                            detailed_results.append(result)
             return {
                 "masscan_results": open_ports,
                 "detailed_results": detailed_results,
                 "total_open_ports": len(detailed_results)
             }
         else:
-            # Если Masscan сработал, выполняем детальное сканирование только открытых портов
+            # Если Masscan сработал – сканируем только найденные порты
             targets_to_scan = self._group_by_ip(open_ports)
-            print(
-                f"[*] Запуск детального сканирования Nmap для {len(targets_to_scan)} хостов...")
+            print(f"[*] Запуск детального сканирования Nmap для {len(targets_to_scan)} хостов...")
             detailed_results = []
             with concurrent.futures.ThreadPoolExecutor(max_workers=self.nmap_threads) as executor:
                 futures = {
@@ -51,11 +61,13 @@ class ScanEngine:
                     for ip, ports_list in targets_to_scan.items()
                 }
                 for future in concurrent.futures.as_completed(futures):
-                    detailed_results.extend(future.result())
+                    for result in future.result():
+                        if result.get('state') == 'open':
+                            detailed_results.append(result)
             return {
                 "masscan_results": open_ports,
                 "detailed_results": detailed_results,
-                "total_open_ports": len(open_ports)
+                "total_open_ports": len(detailed_results)
             }
 
     def _group_by_ip(self, results: List[Dict]) -> Dict:

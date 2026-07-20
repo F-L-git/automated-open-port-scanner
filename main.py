@@ -23,7 +23,7 @@ def main():
     parser.add_argument(
         "--config", "-c", default="config/config.yaml", help="Путь к конфигу")
     parser.add_argument("--force-nmap", action="store_true",
-                        help="Использовать только Nmap, пропустить Masscan")
+                        help="Использовать только Nmap")
     args = parser.parse_args()
 
     setup_logging()
@@ -33,14 +33,10 @@ def main():
     targets_file = args.targets or config.get(
         "targets_file", "targets/targets.txt")
 
-    # Чтение целей (игнорируем пустые строки и комментарии)
     try:
         with open(targets_file, 'r', encoding='utf-8') as f:
-            targets = []
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#'):
-                    targets.append(line)
+            targets = [line.strip() for line in f if line.strip()
+                       and not line.startswith('#')]
     except FileNotFoundError:
         print(f"[!] Файл целей не найден: {targets_file}")
         exit(1)
@@ -49,21 +45,24 @@ def main():
     for t in targets:
         logger.info(f"  - {t}")
 
-    engine = ScanEngine(masscan_rate=args.rate, force_nmap=args.force_nmap)
+    # Передаём путь к Masscan из конфига (если указан)
+    masscan_binary = config.get("scan", {}).get("masscan_binary", "masscan")
+    engine = ScanEngine(masscan_rate=args.rate, force_nmap=args.force_nmap,
+                        masscan_binary=masscan_binary)
     results = engine.run_scan(targets, args.ports)
 
     db = Database(config.get("db_path", "scans.db"))
     scan_id = db.save_scan_results(", ".join(targets), results)
     logger.info(f"Результаты сохранены в БД (ID: {scan_id})")
 
-    # --- Дополнительное обогащение для веб-сервисов ---
+    # Обогащение веб-сервисов – только для открытых портов
     for port_info in results.get("detailed_results", []):
-        if port_info.get("port") in [80, 443, 8080, 8443]:
+        if port_info.get('state') == 'open' and port_info.get("port") in [80, 443, 8080, 8443]:
             web_info = ServiceAnalyzer.analyze_web_service(
                 port_info["ip"], port_info["port"])
-            port_info["web_analysis"] = web_info  # сохраняем в результат
+            port_info["web_analysis"] = web_info
 
-    # --- Настройка уведомлений ---
+    # Настройка уведомлений
     notifiers = []
     if config.get("telegram", {}).get("enabled"):
         tg = config["telegram"]
@@ -81,13 +80,11 @@ def main():
             email_cfg["to_addrs"]
         ))
 
-    # Проверка высокорисковых сервисов
+    # Проверка высокорисковых сервисов – только для открытых портов
     for port_info in results.get("detailed_results", []):
-        if AlertRules.check_high_risk(
-            port_info["ip"],
-            port_info["port"],
-            port_info.get("service", "")
-        ):
+        if port_info.get('state') != 'open':
+            continue
+        if AlertRules.check_high_risk(port_info["ip"], port_info["port"], port_info.get("service", "")):
             alert_msg = AlertRules.generate_alert(
                 port_info["ip"],
                 port_info["port"],
@@ -100,7 +97,8 @@ def main():
 
     logger.info("=== СВОДКА ===")
     logger.info(f"Всего открытых портов: {results['total_open_ports']}")
-    logger.info(f"Детально просканировано: {len(results['detailed_results'])}")
+    logger.info(
+        f"Детально просканировано (только open): {len(results['detailed_results'])}")
 
 
 if __name__ == "__main__":
