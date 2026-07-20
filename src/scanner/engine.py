@@ -6,7 +6,7 @@ from .nmap_wrapper import NmapWrapper
 
 
 class ScanEngine:
-    def __init__(self, masscan_rate: int = 1000, nmap_threads: int = 10, force_nmap: bool = False,
+    def __init__(self, masscan_rate: int = 1000, nmap_threads: int = 10, force_nmap: bool = True,
                  masscan_binary: str = "masscan"):
         self.masscan = MasscanWrapper(
             binary_path=masscan_binary, rate=masscan_rate)
