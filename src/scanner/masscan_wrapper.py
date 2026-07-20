@@ -8,7 +8,7 @@ class MasscanWrapper:
     def __init__(self, binary_path: str = "masscan", rate: int = 1000):
         self.binary_path = binary_path
         self.rate = rate
-        self.scanner = Masscan(binary_path=binary_path)
+        self.scanner = Masscan(bin_path=binary_path)
 
     def scan_targets(self, targets: List[str], ports: str = "1-65535") -> List[Dict]:
         """

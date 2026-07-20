@@ -31,10 +31,14 @@ def main():
     targets_file = args.targets or config.get(
         "targets_file", "targets/targets.txt")
 
-    with open(targets_file, 'r') as f:
-        targets = [line.strip() for line in f if line.strip()]
-
-    logger.info(f"Запуск сканирования для {len(targets)} целей")
+    # Чтение целей
+    try:
+        with open(targets_file, 'r', encoding='utf-8') as f:
+            targets = [line.strip() for line in f if line.strip()]
+    except FileNotFoundError:
+        print(f"[!] Файл целей не найден: {targets_file}")
+        exit(1)
+        logger.info(f"Запуск сканирования для {len(targets)} целей")
 
     engine = ScanEngine(masscan_rate=args.rate)
     results = engine.run_scan(targets, args.ports)
