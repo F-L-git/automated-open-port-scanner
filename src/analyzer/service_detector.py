@@ -1,7 +1,9 @@
 import requests
 import ssl
 import socket
-from typing import Dict, Optional
+import re
+from typing import Dict
+from datetime import datetime
 
 
 class ServiceAnalyzer:
@@ -17,7 +19,7 @@ class ServiceAnalyzer:
             result["http"] = {
                 "status_code": resp.status_code,
                 "server": resp.headers.get("Server", "unknown"),
-                "title": self._extract_title(resp.text)
+                "title": ServiceAnalyzer._extract_title(resp.text)
             }
         except requests.exceptions.RequestException:
             # HTTPS
@@ -29,14 +31,14 @@ class ServiceAnalyzer:
                     "server": resp.headers.get("Server", "unknown")
                 }
                 # SSL-информация
-                result["ssl"] = self._get_ssl_info(ip, port)
+                result["ssl"] = ServiceAnalyzer._get_ssl_info(ip, port)
             except:
                 pass
         return result
 
     @staticmethod
     def _get_ssl_info(ip: str, port: int) -> Dict:
-        """Извлекает информацию из SSL-сертификата.[reference:6]"""
+        """Извлекает информацию из SSL-сертификата."""
         try:
             context = ssl.create_default_context()
             with socket.create_connection((ip, port), timeout=5) as sock:
@@ -47,7 +49,23 @@ class ServiceAnalyzer:
                         "issuer": dict(x[0] for x in cert.get("issuer", [])),
                         "not_before": cert.get("notBefore"),
                         "not_after": cert.get("notAfter"),
-                        "expired": self._check_expired(cert.get("notAfter"))
+                        "expired": ServiceAnalyzer._check_expired(cert.get("notAfter"))
                     }
         except:
             return {"error": "SSL info unavailable"}
+
+    @staticmethod
+    def _extract_title(html: str) -> str:
+        """Извлекает заголовок из HTML-страницы."""
+        match = re.search(r"<title>(.*?)</title>", html,
+                          re.IGNORECASE | re.DOTALL)
+        return match.group(1).strip() if match else ""
+
+    @staticmethod
+    def _check_expired(not_after: str) -> bool:
+        """Проверяет, истёк ли срок действия сертификата."""
+        try:
+            expiry = datetime.strptime(not_after, "%b %d %H:%M:%S %Y %Z")
+            return expiry < datetime.now()
+        except:
+            return True  # если не удалось распарсить, считаем истёкшим
