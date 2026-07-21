@@ -1,33 +1,44 @@
-    port-scanner/
+```text
+
+automated-open-port-scanner/
 ├── src/
-│   ├── __init__.py
 │   ├── scanner/
 │   │   ├── __init__.py
-│   │   ├── masscan_wrapper.py    # Обёртка для Masscan
-│   │   ├── nmap_wrapper.py       # Обёртка для Nmap
-│   │   └── engine.py             # Основной движок сканирования
+│   │   ├── engine.py             # (приведён выше)
+│   │   ├── masscan_wrapper.py    # (приведён выше)
+│   │   └── nmap_wrapper.py       # (приведён выше)
 │   ├── analyzer/
 │   │   ├── __init__.py
-│   │   ├── service_detector.py   # Детектор сервисов
-│   │   ├── web_analyzer.py       # Анализ веб-сервисов
-│   │   └── ssl_analyzer.py       # Анализ SSL/TLS
+│   │   ├── service_detector.py   # (приведён выше)
+│   │   ├── web_analyzer.py
+│   │   └── ssl_analyzer.py       # (приведён выше)
 │   ├── storage/
 │   │   ├── __init__.py
-│   │   ├── database.py           # Работа с БД
-│   │   └── models.py             # Модели данных
+│   │   ├── database.py           # (приведён ниже)
+│   │   └── models.py             # (приведён ниже)
 │   ├── notifier/
 │   │   ├── __init__.py
-│   │   ├── telegram.py
-│   │   ├── email.py
-│   │   └── webhook.py
+│   │   ├── telegram.py           # (приведён выше)
+│   │   ├── webhook.py            # (приведён выше)
+│   │   ├── email.py              # (приведён выше)
+│   │   └── alert_rules.py        # (приведён выше)
 │   └── utils/
 │       ├── __init__.py
-│       ├── config.py             # Загрузка конфигурации
-│       └── logger.py             # Логирование
+│       ├── config.py             # (приведён ниже)
+│       └── logger.py             # (приведён ниже)
 ├── config/
-│   └── config.yaml               # Конфигурационный файл
+│   └── config.yaml               # (приведён выше)
 ├── targets/
-│   └── targets.txt               # Список целей для сканирования
-├── requirements.txt
-├── main.py                       # Точка входа
-└── README.md
+│   └── targets.txt               # (пример)
+├── main.py                       # (приведён выше)
+├── requirements.txt              # (приведён ниже)
+├── Dockerfile                    # (приведён ниже)
+├── docker-compose.yml            # (приведён ниже)
+├── .dockerignore                 # (приведён ниже)
+├── .gitignore                    # (приведён ниже)
+├── README.md                     # (полный текст – приведён ниже)
+├── LICENSE                       # (MIT – приведён ниже)
+└── .github/
+    └── workflows/
+        └── docker-publish.yml    # (приведён ниже)
+```
