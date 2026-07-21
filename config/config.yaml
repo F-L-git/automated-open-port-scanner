@@ -5,9 +5,10 @@ scan:
   masscan_rate: 3000
   nmap_threads: 10
   default_ports: "1-65535"
+  masscan_binary: "masscan" # или полный путь в Windows
 
 telegram:
-  enabled: false
+  enabled: false # включите при наличии токена
   bot_token: "YOUR_BOT_TOKEN"
   chat_id: "YOUR_CHAT_ID"
 
@@ -22,8 +23,7 @@ email:
   username: "your_email@gmail.com"
   password: "your_app_password"
   from_addr: "your_email@gmail.com"
-  to_addrs:
-    - "admin@example.com"
+  to_addrs: ["admin@example.com"]
 
 high_risk_ports:
   - 22
