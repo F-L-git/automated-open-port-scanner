@@ -169,6 +169,101 @@ python main.py -c config/config.yaml -t targets/prod.txt
 python main.py --targets targets/targets.txt --ports "22,80,443" --force-nmap
 ```
 
+## 🐳 ИСПОЛЬЗОВАНИЕ С DOCKER
+
+Контейнеризация позволяет запускать сканер в изолированной среде без установки системных зависимостей на хост-машине. Всё необходимое (`Masscan`, `Nmap`, `Python`) упаковано в образ.
+
+### Создайте `Dockerfile` в корне проекта
+
+```dockerfile
+FROM python:3.11-slim
+
+RUN apt-get update && apt-get install -y \
+    masscan \
+    nmap \
+    iproute2 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+ENTRYPOINT ["python", "main.py"]
+```
+
+### Сборка образа
+
+```bash
+docker build -t port-scanner .
+```
+
+### Запуск контейнера
+
+Для работы масс-сканера требуются права на отправку сырых пакетов. В `Docker` используются `--cap-add=NET_RAW` и `--cap-add=NET_ADMIN`. Также часто требуется `--network host`, чтобы контейнер видел сетевые интерфейсы хост-системы.
+
+#### Базовый запуск (с хостовой сетью)
+
+```bash
+docker run --rm \
+  --network host \
+  --cap-add=NET_RAW \
+  --cap-add=NET_ADMIN \
+  port-scanner --targets targets/targets.txt --ports 8080
+```
+
+#### Запуск с монтированием внешних файлов целей и конфига
+
+```bash
+docker run --rm \
+  --network host \
+  --cap-add=NET_RAW \
+  --cap-add=NET_ADMIN \
+  -v $(pwd)/targets:/app/targets \
+  -v $(pwd)/config:/app/config \
+  port-scanner --targets targets/targets.txt --ports 8080
+```
+
+> **Примечание:**
+> в конфиге (`config/config.yaml`) укажите `db_path: "data/scans.db"`, чтобы БД сохранялась в смонтированную папку.
+
+#### Запуск с принудительным использованием только Nmap
+
+```bash
+docker run --rm \
+  --network host \
+  port-scanner --targets targets/targets.txt --ports 8080 --force-nmap
+```
+
+### Docker Compose (для повторяющихся запусков)
+
+Создайте `docker-compose.yml`:
+
+```yaml
+version: "3.8"
+services:
+  scanner:
+    build: .
+    network_mode: host
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    volumes:
+      - ./targets:/app/targets
+      - ./config:/app/config
+      - ./data:/app/data
+      - ./logs:/app/logs
+    command: --targets targets/targets.txt --ports 8080
+```
+
+Запуск одной командой:
+
+```bash
+docker-compose up
+```
+
 ## КЛЮЧЕВЫЕ ОСОБЕННОСТИ
 
 ```text
@@ -219,4 +314,3 @@ python main.py --targets targets/targets.txt --ports "22,80,443" --force-nmap
 > защищаемого периметра. Сочетание скорости `Masscan` и глубины `Nmap` позволяет
 > оперативно выявлять уязвимые сервисы, а система оповещений гарантирует,
 > что владельцы инфраструктуры будут проинформированы об обнаруженных рисках
-

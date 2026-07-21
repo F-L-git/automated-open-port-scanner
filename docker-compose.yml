@@ -1,0 +1,14 @@
+version: "3.8"
+services:
+  scanner:
+    build: .
+    network_mode: host
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    volumes:
+      - ./targets:/app/targets
+      - ./config:/app/config
+      - ./data:/app/data
+      - ./logs:/app/logs
+    command: --targets targets/targets.txt --ports 8080
